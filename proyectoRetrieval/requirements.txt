@@ -1,0 +1,10 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+torch>=2.5.0
+torchvision>=0.20.0
+transformers>=4.46.0
+datasets>=3.0.0
+pandas>=2.2.0
+numpy>=2.1.0
+pillow>=10.4.0
+faiss-cpu>=1.8.0

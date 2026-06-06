@@ -1,0 +1,16 @@
+services:
+  retrieval-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: retrieval-api
+    ports:
+      - "8000:8000"
+    environment:
+      HF_HOME: /cache/huggingface
+    volumes:
+      - hf_cache:/cache/huggingface
+    restart: unless-stopped
+
+volumes:
+  hf_cache:

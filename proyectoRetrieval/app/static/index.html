@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiT Retrieval Demo</title>
+    <style>
+        :root {
+            --bg: #f3ede2;
+            --surface: rgba(255, 252, 246, 0.86);
+            --surface-strong: #fffaf2;
+            --ink: #1d1c1a;
+            --muted: #5e5a53;
+            --line: rgba(29, 28, 26, 0.12);
+            --accent: #0e7c66;
+            --accent-2: #de6b48;
+            --shadow: 0 20px 60px rgba(63, 44, 19, 0.14);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(222, 107, 72, 0.18), transparent 28%),
+                radial-gradient(circle at right 20%, rgba(14, 124, 102, 0.14), transparent 24%),
+                linear-gradient(145deg, #ede2cf 0%, #f7f2e9 48%, #efe6d7 100%);
+            padding: 32px 20px 60px;
+        }
+
+        .shell {
+            width: min(1120px, 100%);
+            margin: 0 auto;
+            display: grid;
+            gap: 24px;
+        }
+
+        .hero,
+        .panel,
+        .result-card {
+            backdrop-filter: blur(16px);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            border-radius: 24px;
+        }
+
+        .hero {
+            padding: 28px;
+            display: grid;
+            gap: 18px;
+        }
+
+        .eyebrow {
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            font-size: 0.76rem;
+            color: var(--accent);
+            margin: 0;
+        }
+
+        h1 {
+            font-size: clamp(2rem, 4vw, 4rem);
+            line-height: 0.95;
+            margin: 0;
+            max-width: 10ch;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 62ch;
+            color: var(--muted);
+            font-size: 1.05rem;
+        }
+
+        .panel {
+            padding: 24px;
+            display: grid;
+            gap: 18px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 120px auto;
+            gap: 14px;
+            align-items: end;
+        }
+
+        label {
+            display: grid;
+            gap: 8px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+
+        textarea,
+        select,
+        button {
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            font: inherit;
+        }
+
+        textarea,
+        select {
+            background: var(--surface-strong);
+            padding: 16px;
+            color: var(--ink);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 88px;
+        }
+
+        button {
+            padding: 16px 20px;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), #2d9d86);
+            color: white;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            transition: transform 160ms ease, box-shadow 160ms ease;
+            box-shadow: 0 10px 24px rgba(14, 124, 102, 0.24);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: wait;
+            opacity: 0.75;
+        }
+
+        .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .chip {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(14, 124, 102, 0.08);
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .status {
+            min-height: 24px;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .results {
+            display: grid;
+            gap: 18px;
+        }
+
+        .result-card {
+            padding: 18px;
+            display: grid;
+            grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+            gap: 18px;
+            animation: reveal 320ms ease both;
+        }
+
+        .thumb {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border-radius: 18px;
+            background: #e8ddcd;
+        }
+
+        .result-copy {
+            display: grid;
+            gap: 12px;
+            align-content: start;
+        }
+
+        .result-copy h2 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+
+        .caption {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .code-block {
+            margin: 0;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #1f2421;
+            color: #eef5ef;
+            overflow: auto;
+            font-family: "Cascadia Code", Consolas, monospace;
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
+
+        @keyframes reveal {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 840px) {
+            .controls,
+            .result-card {
+                grid-template-columns: 1fr;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <p class="eyebrow">LiT Retrieval API</p>
+            <h1>Texto a imagen con embeddings comprimidos</h1>
+            <p>
+                Esta interfaz consulta la API de retrieval, envía un query y un valor de k, y muestra captions, imágenes
+                recuperadas y los embeddings retornados por el backend en formato compacto.
+            </p>
+            <div class="meta" id="meta"></div>
+        </section>
+
+        <section class="panel">
+            <div class="controls">
+                <label>
+                    Query
+                    <textarea id="queryInput" placeholder="Ejemplo: a dog running through the grass">A dog running through the grass</textarea>
+                </label>
+
+                <label>
+                    Top K
+                    <select id="kSelect">
+                        <option value="1">1</option>
+                        <option value="3" selected>3</option>
+                        <option value="5">5</option>
+                        <option value="8">8</option>
+                        <option value="10">10</option>
+                    </select>
+                </label>
+
+                <button id="searchButton" type="button">Consultar API</button>
+            </div>
+
+            <div class="status" id="status">Listo para consultar.</div>
+            <pre class="code-block" id="queryEmbeddingBlock">El embedding del query aparecerá aquí.</pre>
+        </section>
+
+        <section class="results" id="results"></section>
+    </main>
+
+    <script>
+        const queryInput = document.getElementById('queryInput');
+        const kSelect = document.getElementById('kSelect');
+        const searchButton = document.getElementById('searchButton');
+        const statusBox = document.getElementById('status');
+        const resultsBox = document.getElementById('results');
+        const queryEmbeddingBlock = document.getElementById('queryEmbeddingBlock');
+        const metaBox = document.getElementById('meta');
+
+        function embeddingPreview(payload) {
+            return JSON.stringify({
+                encoding: payload.encoding,
+                dtype: payload.dtype,
+                shape: payload.shape,
+                data_preview: `${payload.data.slice(0, 96)}...`
+            }, null, 2);
+        }
+
+        function renderMeta(config, device) {
+            metaBox.innerHTML = '';
+            const chips = [
+                `Imagen: ${config.Modelo_Imagen}`,
+                `Texto: ${config.Modelo_Texto}`,
+                `Tipo: ${config.Tipo_Texto}`,
+                `Tau: ${config.Tau}`,
+                `Device: ${device}`
+            ];
+            for (const text of chips) {
+                const chip = document.createElement('span');
+                chip.className = 'chip';
+                chip.textContent = text;
+                metaBox.appendChild(chip);
+            }
+        }
+
+        function renderResults(data) {
+            resultsBox.innerHTML = '';
+            queryEmbeddingBlock.textContent = embeddingPreview(data.query_embedding);
+            renderMeta(data.config, data.device);
+
+            const textSummary = document.createElement('article');
+            textSummary.className = 'result-card';
+            textSummary.innerHTML = `
+                <div class="result-copy" style="grid-column: 1 / -1;">
+                    <h2>Top textos recuperados</h2>
+                    <pre class="code-block">${JSON.stringify(data.text_results.map(item => ({
+                        rank: item.rank,
+                        caption_index: item.caption_index,
+                        caption_score: Number(item.caption_score.toFixed(4)),
+                        caption: item.caption,
+                        embedding: {
+                            encoding: item.caption_embedding.encoding,
+                            dtype: item.caption_embedding.dtype,
+                            shape: item.caption_embedding.shape,
+                            data_preview: `${item.caption_embedding.data.slice(0, 72)}...`
+                        }
+                    })), null, 2)}</pre>
+                </div>
+            `;
+            resultsBox.appendChild(textSummary);
+
+            for (const item of data.image_results) {
+                const card = document.createElement('article');
+                card.className = 'result-card';
+                card.innerHTML = `
+                    <img class="thumb" src="data:image/jpeg;base64,${item.image_base64}" alt="Resultado ${item.rank}">
+                    <div class="result-copy">
+                        <h2>Resultado ${item.rank}</h2>
+                        <p class="caption">${item.caption}</p>
+                        <div class="meta">
+                            <span class="chip">image_score: ${item.image_score.toFixed(4)}</span>
+                            <span class="chip">caption_score: ${item.caption_score.toFixed(4)}</span>
+                            <span class="chip">image_idx: ${item.image_index}</span>
+                            <span class="chip">caption_idx: ${item.caption_index}</span>
+                        </div>
+                        <pre class="code-block">${embeddingPreview(item.image_embedding)}</pre>
+                        <pre class="code-block">${embeddingPreview(item.caption_embedding)}</pre>
+                    </div>
+                `;
+                resultsBox.appendChild(card);
+            }
+        }
+
+        async function runQuery() {
+            const query = queryInput.value.trim();
+            const k = Number(kSelect.value);
+
+            if (!query) {
+                statusBox.textContent = 'Escribe un query antes de consultar.';
+                return;
+            }
+
+            searchButton.disabled = true;
+            statusBox.textContent = 'Consultando API y reconstruyendo resultados...';
+
+            try {
+                const response = await fetch('/api/retrieve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query, k })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderResults(data);
+                statusBox.textContent = `Consulta completada para "${data.query}" con k=${data.k}.`;
+            } catch (error) {
+                resultsBox.innerHTML = '';
+                queryEmbeddingBlock.textContent = 'No se pudo obtener el embedding del query.';
+                statusBox.textContent = `Fallo al consultar la API: ${error.message}`;
+            } finally {
+                searchButton.disabled = false;
+            }
+        }
+
+        searchButton.addEventListener('click', runQuery);
+    </script>
+</body>
+</html>

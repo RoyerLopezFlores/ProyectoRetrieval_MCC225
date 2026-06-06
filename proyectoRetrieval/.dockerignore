@@ -1,0 +1,24 @@
+.git
+.gitignore
+.vscode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.ipynb_checkpoints
+
+# Local virtual envs
+.venv
+venv
+
+# Heavy local artifacts not needed in image build context
+CuadernoLIT.ipynb
+experimento.png
+graph.md
+graph2.md
+ficha_tecnica.md
+presentacion.md
+infoNCE.html
+
+# Persist these via bind volume if needed
+cache
