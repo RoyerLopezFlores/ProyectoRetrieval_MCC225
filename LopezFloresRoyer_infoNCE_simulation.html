@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador: Pérdida InfoNCE y Temperatura</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+        }
+        .container {
+            max-width: 680px;
+            width: 100%;
+            background-color: #252526;
+            padding: 14px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h2 {
+            margin: 10px 0 8px;
+            font-size: 1.1rem;
+        }
+        .control-panel {
+            margin-bottom: 12px;
+            padding: 8px;
+            background-color: #333333;
+            border-radius: 6px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        input[type="range"] {
+            flex-grow: 1;
+        }
+        .matrix {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+            width: min(100%, 480px);
+            margin: 0 auto 14px;
+        }
+        .cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.66rem;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+            transition: background-color 0.2s;
+        }
+        .chart-container {
+            height: 170px;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            padding: 6px 0;
+            border-bottom: 1px solid #555;
+            margin-bottom: 10px;
+        }
+        .bar-group {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            height: 100%;
+        }
+        .bar {
+            width: 100%;
+            background-color: #007acc;
+            border-radius: 4px 4px 0 0;
+            transition: height 0.2s, background-color 0.2s;
+        }
+        .bar.target {
+            background-color: #4CAF50; /* Verde para el par correcto */
+        }
+        .bar.false-pair {
+            background-color: #F44336; /* Rojo para los pares incorrectos */
+        }
+        .bar-label {
+            margin-top: 4px;
+            font-size: 0.66rem;
+        }
+        .loss-display {
+            font-size: 1.08rem;
+            font-weight: bold;
+            text-align: center;
+            color: #ff9800;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 10px;
+            }
+            .matrix {
+                width: 100%;
+            }
+            .chart-container {
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Matriz de Similitud Escalada (S / τ)</h2>
+    <div class="control-panel">
+        <div class="slider-container">
+            <label for="tempSlider">Temperatura (τ): <span id="tempValue">0.10</span></label>
+            <input type="range" id="tempSlider" min="0.01" max="1.0" step="0.01" value="0.1">
+        </div>
+    </div>
+
+    <div class="matrix" id="matrixGrid"></div>
+
+    <h2>Distribución Softmax (Fila 1: Imagen 1 vs Todos los Textos)</h2>
+    <div class="chart-container" id="barChart"></div>
+
+    <div class="loss-display">
+        InfoNCE Loss (Fila 1): <span id="lossValue">0.0000</span>
+    </div>
+</div>
+
+<script>
+    const N = 8;
+    const matrixGrid = document.getElementById('matrixGrid');
+    const barChart = document.getElementById('barChart');
+    const tempSlider = document.getElementById('tempSlider');
+    const tempValue = document.getElementById('tempValue');
+    const lossValue = document.getElementById('lossValue');
+
+    // Inicializar matriz base de similitudes (producto punto)
+    // Diagonal alta (pares correctos), resto aleatorio bajo (pares incorrectos)
+    let baseSim = [];
+    for (let i = 0; i < N; i++) {
+        let row = [];
+        for (let j = 0; j < N; j++) {
+            if (i === j) {
+                row.push(0.5 + Math.random() * 0.4); // 0.5 a 0.9
+            } else {
+                row.push(-0.2 + Math.random() * 0.6); // -0.2 a 0.4
+            }
+        }
+        baseSim.push(row);
+    }
+
+    function getColor(value, maxVal) {
+        // Escalar color de azul oscuro a rojo intenso basado en el valor
+        const normalized = Math.max(0, Math.min(1, (value + 5) / (maxVal + 5)));
+        const r = Math.round(normalized * 255);
+        const b = Math.round((1 - normalized) * 255);
+        return `rgb(${r}, 50, ${b})`;
+    }
+
+    function updateVisualization() {
+        const tau = parseFloat(tempSlider.value);
+        tempValue.textContent = tau.toFixed(2);
+
+        matrixGrid.innerHTML = '';
+        barChart.innerHTML = '';
+
+        // Calcular matriz escalada y buscar máximo global para colorear
+        let scaledMatrix = baseSim.map(row => row.map(val => val / tau));
+        let maxScaled = Math.max(...scaledMatrix.flat());
+
+        // Renderizar Matriz
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N; j++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                const val = scaledMatrix[i][j];
+                cell.textContent = val.toFixed(1);
+                cell.style.backgroundColor = getColor(val, maxScaled);
+                
+                // Resaltar la fila 1 (índice 0) que estamos analizando
+                if (i === 0) {
+                    cell.style.border = "2px solid #fff";
+                }
+                
+                matrixGrid.appendChild(cell);
+            }
+        }
+
+        // Calcular Softmax para la Fila 0 (Imagen 1)
+        const row0 = scaledMatrix[0];
+        // Estabilidad numérica: restar el máximo antes de exp()
+        const maxRow0 = Math.max(...row0);
+        const expVals = row0.map(val => Math.exp(val - maxRow0));
+        const sumExp = expVals.reduce((a, b) => a + b, 0);
+        const softmax = expVals.map(val => val / sumExp);
+
+        // Renderizar Gráfico de Barras
+        for (let j = 0; j < N; j++) {
+            const prob = softmax[j];
+            
+            const group = document.createElement('div');
+            group.className = 'bar-group';
+            
+            const bar = document.createElement('div');
+            bar.className = `bar ${j === 0 ? 'target' : 'false-pair'}`;
+            bar.style.height = `${prob * 100}%`;
+            
+            const label = document.createElement('div');
+            label.className = 'bar-label';
+            label.textContent = `${(prob * 100).toFixed(1)}%`;
+            
+            group.appendChild(bar);
+            group.appendChild(label);
+            barChart.appendChild(group);
+        }
+
+        // Calcular InfoNCE Loss para esta fila: -log(p_true)
+        // El par verdadero para la Fila 0 es el Índice 0
+        const loss = -Math.log(softmax[0]);
+        lossValue.textContent = loss.toFixed(4);
+    }
+
+    // Listeners
+    tempSlider.addEventListener('input', updateVisualization);
+
+    // Inicialización
+    updateVisualization();
+</script>
+
+</body>
+</html>

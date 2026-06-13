@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canva Interactivo - Alineamiento Constructivo & Hard Negatives</title>
+    <!-- Tailwind CSS para el diseño -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons para los iconos modernos -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .font-brand {
+            font-family: 'Nunito', sans-serif;
+        }
+        .canva-gradient {
+            background: linear-gradient(135deg, #00C4CC 0%, #7D2AE8 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- BARRA DE NAVEGACIÓN ESTILO CANVA -->
+    <header class="canva-gradient text-white px-4 py-3 flex items-center justify-between shadow-md">
+        <div class="flex items-center space-x-3">
+            <div class="bg-white p-1.5 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-[#7D2AE8]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
+            </div>
+            <div>
+                <span class="text-xs uppercase tracking-wider font-semibold opacity-80">Diseño de Plantilla</span>
+                <h1 class="font-brand font-bold text-lg leading-tight">Alineamiento Constructivo & Negativos</h1>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <span class="hidden md:inline-block bg-white/20 text-xs px-2.5 py-1 rounded-full border border-white/30">
+                ✨ Modo Presentación Activo
+            </span>
+            <button onclick="window.print()" class="bg-white text-[#7D2AE8] hover:bg-purple-50 font-semibold text-sm px-4 py-2 rounded-lg shadow transition flex items-center space-x-2">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Imprimir / PDF</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ÁREA DE TRABAJO (ESTILO EDITOR DE CANVA) -->
+    <main class="flex-1 flex flex-col lg:flex-row">
+        
+        <!-- PANEL LATERAL DE EDICIÓN / HERRAMIENTAS (FLAVOR DE CANVA) -->
+        <aside class="w-full lg:w-80 bg-slate-900 text-slate-300 p-6 flex flex-col justify-between border-r border-slate-800">
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-white font-semibold text-sm tracking-wider uppercase mb-3 text-purple-400">Guía del Entrenador</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        El <strong>Alineamiento Constructivo</strong> es la técnica que usamos para que la IA aprenda a comparar cosas. Para lograrlo, le mostramos un elemento base (Ancla) y le enseñamos qué debe acercar y qué debe alejar.
+                    </p>
+                </div>
+
+                <div class="border-t border-slate-800 pt-4">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Simulador de "Confusión"</h4>
+                    <p class="text-xs text-slate-400 mb-3">Cambia la dificultad del caso seleccionado y mira cómo reacciona la IA:</p>
+                    
+                    <div class="space-y-4 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Distancia del Vector:</span>
+                                <span id="dist-val" class="font-mono text-purple-400">0.75</span>
+                            </div>
+                            <input type="range" id="sim-slider" min="0" max="100" value="75" class="w-full accent-purple-500 cursor-pointer">
+                        </div>
+                        <div class="text-[11px] text-slate-400 flex items-center space-x-2">
+                            <i data-lucide="info" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>
+                            <span id="slider-desc">El modelo tiene dificultades para diferenciar estos conceptos.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-800 pt-4">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Instrucciones Visuales</h4>
+                    <ul class="text-xs space-y-2 text-slate-400">
+                        <li class="flex items-start space-x-2">
+                            <span class="text-emerald-400">✔</span>
+                            <span>Haz clic en las filas de la matriz para examinar cada caso.</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <span class="text-purple-400">✔</span>
+                            <span>Usa el "Termómetro de Similitud" para explicar el nivel de riesgo en tu presentación.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-slate-800 text-[11px] text-slate-500">
+                Diseñado para explicaciones didácticas de Machine Learning. 2026.
+            </div>
+        </aside>
+
+        <!-- EL LIENZO PRINCIPAL (LA DIAPOSITIVA) -->
+        <section class="flex-1 bg-slate-100 p-4 md:p-8 flex items-center justify-center overflow-y-auto">
+            
+            <!-- CONTENEDOR DE LA DIAPOSITIVA (FORMATO 16:9 RECREADO) -->
+            <div class="w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+                
+                <!-- CABECERA DE LA DIAPOSITIVA -->
+                <div class="p-6 bg-gradient-to-r from-slate-50 to-purple-50/40 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <span class="bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                            Conceptos Clave de Inteligencia Artificial
+                        </span>
+                        <h2 class="font-brand text-2xl md:text-3xl font-extrabold text-slate-800 mt-1">
+                            El Reto del Alineamiento Constructivo
+                        </h2>
+                        <p class="text-slate-500 text-sm mt-1">
+                            ¿Cómo aprende una IA a distinguir un Gato 🐱 de sus "impostores"?
+                        </p>
+                    </div>
+                    <div class="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
+                        <span class="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+                        <span class="text-xs font-semibold text-slate-600">Foco: Hard Negatives</span>
+                    </div>
+                </div>
+
+                <!-- CUERPO DE LA DIAPOSITIVA (2 COLUMNAS INTERACTIVAS) -->
+                <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+                    
+                    <!-- COLUMNA IZQUIERDA: MATRIZ DE SIMILITUD (7 de 12 cols) -->
+                    <div class="lg:col-span-7 flex flex-col justify-between space-y-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center space-x-2">
+                                <i data-lucide="grid" class="w-4 h-4 text-purple-600"></i>
+                                <span>Matriz de Similitud de Vectores (Referencia: Gato 🐱)</span>
+                            </h3>
+                            
+                            <!-- TABLA INTERACTIVA -->
+                            <div class="overflow-hidden border border-slate-200 rounded-xl shadow-sm">
+                                <table class="min-w-full divide-y divide-slate-200 text-sm text-left">
+                                    <thead class="bg-slate-50">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3 font-bold text-slate-600">Concepto</th>
+                                            <th scope="col" class="px-4 py-3 font-bold text-slate-600">Tipo de Caso</th>
+                                            <th scope="col" class="px-4 py-3 font-bold text-slate-600 text-center">Similitud (0-1)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 bg-white">
+                                        <!-- CASO 1: FALSE NEGATIVE -->
+                                        <tr id="row-false" onclick="selectCase('false')" class="cursor-pointer transition-all hover:bg-red-50/50">
+                                            <td class="px-4 py-3.5 font-medium text-slate-900 flex items-center space-x-2">
+                                                <span class="text-xl">😸</span>
+                                                <span>Michi / Gatito</span>
+                                            </td>
+                                            <td class="px-4 py-3.5">
+                                                <span class="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-red-200">
+                                                    False Negative
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3.5 text-center font-bold text-red-600 font-mono text-base">0.99 ❌</td>
+                                        </tr>
+
+                                        <!-- CASO 2: HARD NEGATIVE -->
+                                        <tr id="row-hard" onclick="selectCase('hard')" class="cursor-pointer transition-all bg-orange-50 border-l-4 border-l-orange-500 shadow-sm">
+                                            <td class="px-4 py-3.5 font-medium text-slate-900 flex items-center space-x-2">
+                                                <span class="text-xl">🐶</span>
+                                                <span class="font-bold">Perro (Impostor)</span>
+                                            </td>
+                                            <td class="px-4 py-3.5">
+                                                <span class="bg-orange-100 text-orange-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-orange-200 animate-pulse">
+                                                    Hard Negative ⚠️
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3.5 text-center font-bold text-orange-600 font-mono text-base">0.75 ⚠️</td>
+                                        </tr>
+
+                                        <!-- CASO 3: SEMI-HARD NEGATIVE -->
+                                        <tr id="row-semi" onclick="selectCase('semi')" class="cursor-pointer transition-all hover:bg-yellow-50/50">
+                                            <td class="px-4 py-3.5 font-medium text-slate-900 flex items-center space-x-2">
+                                                <span class="text-xl">🦁</span>
+                                                <span>León / Tigre</span>
+                                            </td>
+                                            <td class="px-4 py-3.5">
+                                                <span class="bg-yellow-100 text-yellow-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-yellow-200">
+                                                    Semi-Hard Negative
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3.5 text-center font-bold text-yellow-600 font-mono text-base">0.50 🧐</td>
+                                        </tr>
+
+                                        <!-- CASO 4: EASY NEGATIVE -->
+                                        <tr id="row-easy" onclick="selectCase('easy')" class="cursor-pointer transition-all hover:bg-emerald-50/50">
+                                            <td class="px-4 py-3.5 font-medium text-slate-900 flex items-center space-x-2">
+                                                <span class="text-xl">🥦</span>
+                                                <span>Brócoli / Verdura</span>
+                                            </td>
+                                            <td class="px-4 py-3.5">
+                                                <span class="bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                                                    Easy Negative
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3.5 text-center font-bold text-emerald-600 font-mono text-base">0.05 ✅</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- TERMÓMETRO VISUAL DE ALINEAMIENTO -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Escala de Dificultad para el Alineamiento</h4>
+                            <div class="h-6 w-full rounded-full bg-gradient-to-r from-emerald-500 via-yellow-400 to-red-600 flex relative overflow-hidden shadow-inner">
+                                <!-- Líneas divisorias -->
+                                <div class="absolute left-1/4 h-full w-[1px] bg-white/40"></div>
+                                <div class="absolute left-2/4 h-full w-[1px] bg-white/40"></div>
+                                <div class="absolute left-3/4 h-full w-[1px] bg-white/40"></div>
+                                
+                                <!-- Etiquetas rápidas -->
+                                <span class="absolute left-4 top-1 text-[10px] font-bold text-white uppercase drop-shadow">Fácil</span>
+                                <span class="absolute left-1/3 top-1 text-[10px] font-bold text-white uppercase drop-shadow">Semi-Difícil</span>
+                                <span class="absolute left-[58%] top-1 text-[10px] font-bold text-white uppercase drop-shadow">Difícil</span>
+                                <span class="absolute right-4 top-1 text-[10px] font-bold text-white uppercase drop-shadow">Error</span>
+
+                                <!-- Indicador Dinámico -->
+                                <div id="thermometer-pin" class="absolute top-0 bottom-0 w-1.5 bg-black shadow-lg ring-2 ring-white transition-all duration-300" style="left: 75%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLUMNA DERECHA: EXPLICADOR DETALLADO (5 de 12 cols) -->
+                    <div class="lg:col-span-5 flex flex-col justify-between">
+                        <!-- TARJETA EXPLICATIVA DINÁMICA -->
+                        <div id="explain-card" class="bg-gradient-to-b from-orange-50 to-white border-2 border-orange-200 rounded-2xl p-6 h-full flex flex-col justify-between shadow-md transition-all duration-300">
+                            
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span id="badge-case" class="bg-orange-600 text-white text-xs font-black uppercase px-3 py-1 rounded-full tracking-wider shadow">
+                                        HARD NEGATIVE
+                                    </span>
+                                    <span id="icon-case" class="text-4xl filter drop-shadow">🐶</span>
+                                </div>
+
+                                <h3 id="title-case" class="font-brand text-xl font-bold text-slate-800 mb-2">
+                                    Perro (El Impostor Tramposo)
+                                </h3>
+                                
+                                <p id="desc-case" class="text-slate-600 text-sm leading-relaxed mb-4">
+                                    Es un concepto extremadamente parecido al objetivo (Gato) en la superficie: ambos tienen pelaje, cuatro patas, cola y viven en casas. Sin embargo, pertenece a una clase diferente.
+                                </p>
+
+                                <div class="bg-orange-100/60 p-3 rounded-xl border border-orange-200 mb-4">
+                                    <h4 class="text-xs font-bold text-orange-800 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                        <i data-lucide="zap" class="w-3.5 h-3.5"></i> El problema para la IA:
+                                    </h4>
+                                    <p id="problem-case" class="text-xs text-orange-950 leading-relaxed">
+                                        El algoritmo se confunde y asocia sus características rápidamente. El reto del alineamiento constructivo es "empujar" este 0.75 hacia abajo para que la IA aprenda a notar los detalles sutiles que separan a ambas especies.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- TIP / RECOMENDACIÓN -->
+                            <div class="bg-slate-900 text-slate-100 p-4 rounded-xl flex items-start space-x-3 shadow-inner">
+                                <i data-lucide="lightbulb" class="w-5 h-5 text-yellow-400 shrink-0 mt-0.5 animate-bounce"></i>
+                                <div>
+                                    <h5 class="text-xs font-bold text-white uppercase tracking-wider">¿Cómo se soluciona?</h5>
+                                    <p id="solution-case" class="text-xs text-slate-300 mt-1 leading-relaxed">
+                                        Usando algoritmos de pérdida de contraste (Triplet Loss) que castigan fuertemente al modelo cuando acerca al Perro al Gato.
+                                    </p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- PIE DE LA DIAPOSITIVA (FOOTER) -->
+                <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-2">
+                    <span class="flex items-center space-x-1.5 font-medium">
+                        <i data-lucide="book-open" class="w-4 h-4 text-purple-600"></i>
+                        <span>Tema: Aprendizaje por Contraste (Contrastive Learning)</span>
+                    </span>
+                    <span>Diapositiva Interactiva 1 de 1</span>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- CONTROLADORES JAVASCRIPT -->
+    <script>
+        // Inicializar los iconos de Lucide
+        lucide.createIcons();
+
+        // Datos de cada caso interactivo
+        const cases = {
+            false: {
+                title: "Michi / Gatito (El Clon)",
+                badge: "FALSE NEGATIVE ❌",
+                badgeClass: "bg-red-600 text-white text-xs font-black uppercase px-3 py-1 rounded-full tracking-wider shadow",
+                cardBg: "from-red-50 to-white border-red-200",
+                icon: "😸",
+                similarity: 99,
+                desc: "Es un sinónimo perfecto o una variación idéntica de nuestro objetivo. El sistema lo clasifica como 'diferente' por un error de etiqueta o una palabra distinta, pero en realidad es exactamente lo mismo.",
+                problem: "Vuelve loca a la IA. Le estás diciendo que 'Michi' debe estar lejos de 'Gato' cuando físicamente son idénticos. Esto rompe la estructura del espacio de vectores y confunde todo el entrenamiento.",
+                solution: "Limpiar y normalizar el set de datos antes de entrenar, fusionando sinónimos claros o usando diccionarios semánticos avanzados.",
+                descSlider: "Peligro máximo. La IA está forzada a separar cosas idénticas."
+            },
+            hard: {
+                title: "Perro (El Impostor Tramposo)",
+                badge: "HARD NEGATIVE ⚠️",
+                badgeClass: "bg-orange-600 text-white text-xs font-black uppercase px-3 py-1 rounded-full tracking-wider shadow",
+                cardBg: "from-orange-50 to-white border-orange-200",
+                icon: "🐶",
+                similarity: 75,
+                desc: "Es un concepto sumamente parecido al objetivo (Gato) en la superficie: ambos tienen pelaje, cuatro patas, cola y viven en casas. Sin embargo, biológicamente y conceptualmente es una especie diferente.",
+                problem: "La IA se confunde y asocia sus vectores muy de cerca (0.75). El reto del alineamiento constructivo consiste en obligar a la IA a aprender los rasgos clave que los diferencian (ladra vs maúlla).",
+                solution: "Implementar funciones de pérdida como Triplet Loss que penalizan drásticamente las distancias cortas con impostores cercanos durante el entrenamiento.",
+                descSlider: "La IA tiene serias dificultades para separar al gato del perro."
+            },
+            semi: {
+                title: "León / Tigre (El Primo Lejano)",
+                badge: "SEMI-HARD NEGATIVE 🧐",
+                badgeClass: "bg-yellow-600 text-white text-xs font-black uppercase px-3 py-1 rounded-full tracking-wider shadow",
+                cardBg: "from-yellow-50 to-white border-yellow-200",
+                icon: "🦁",
+                similarity: 50,
+                desc: "Comparte la misma familia biológica (felinos), por lo que tiene rasgos visuales muy parecidos a los de un gato doméstico, pero su contexto (tamaño, hábitat salvaje, peligrosidad) es drásticamente diferente.",
+                problem: "Su similitud es intermedia (0.50). Ayuda a la IA a refinar sus límites, ya que el modelo detecta la similitud corporal, pero puede apoyarse en el fondo de la imagen o el tamaño para diferenciarlo fácilmente.",
+                solution: "Es el rango ideal de entrenamiento. Permite que el modelo aprenda de manera progresiva sin causar frustración o colapso de los pesos.",
+                descSlider: "Nivel de similitud moderado. Útil para un entrenamiento balanceado."
+            },
+            easy: {
+                title: "Brócoli / Verdura (El Opuesto)",
+                badge: "EASY NEGATIVE ✅",
+                badgeClass: "bg-emerald-600 text-white text-xs font-black uppercase px-3 py-1 rounded-full tracking-wider shadow",
+                cardBg: "from-emerald-50 to-white border-emerald-200",
+                icon: "🥦",
+                similarity: 5,
+                desc: "No tiene absolutamente nada que ver con un gato. Es un vegetal, no se mueve, es de color verde y se come en ensaladas. No hay confusión posible.",
+                problem: "La IA lo descarta de inmediato (0.05). Aunque es necesario para establecer límites básicos, entrenar solo con este tipo de negativos hace que la IA sea floja y no aprenda detalles complejos.",
+                solution: "Mantener un porcentaje pequeño en el set para estabilidad, pero priorizar el entrenamiento con negativos más desafiantes.",
+                descSlider: "Nula confusión. La IA descarta este caso sin esfuerzo alguno."
+            }
+        };
+
+        // Función para cambiar de caso seleccionado
+        function selectCase(caseKey) {
+            const data = cases[caseKey];
+            if (!data) return;
+
+            // 1. Remover clases activas de todas las filas y agregar efecto hover normal
+            const keys = Object.keys(cases);
+            keys.forEach(k => {
+                const row = document.getElementById(`row-${k}`);
+                row.className = "cursor-pointer transition-all hover:bg-slate-50/50";
+                // Limpiar bordes específicos
+                row.classList.remove("bg-orange-50", "border-l-4", "border-l-orange-500", "shadow-sm",
+                                      "bg-red-50", "border-l-4", "border-l-red-500",
+                                      "bg-yellow-50", "border-l-4", "border-l-yellow-500",
+                                      "bg-emerald-50", "border-l-4", "border-l-emerald-500");
+            });
+
+            // 2. Resaltar la fila seleccionada con su color correspondiente
+            const selectedRow = document.getElementById(`row-${caseKey}`);
+            let colorTheme = "orange";
+            if (caseKey === "false") colorTheme = "red";
+            if (caseKey === "semi") colorTheme = "yellow";
+            if (caseKey === "easy") colorTheme = "emerald";
+
+            selectedRow.className = `cursor-pointer transition-all bg-${colorTheme}-50/80 border-l-4 border-l-${colorTheme}-500 shadow-sm`;
+
+            // 3. Actualizar la tarjeta explicativa derecha
+            const card = document.getElementById('explain-card');
+            card.className = `bg-gradient-to-b ${data.cardBg} rounded-2xl p-6 h-full flex flex-col justify-between shadow-md transition-all duration-300`;
+            
+            document.getElementById('badge-case').innerText = data.badge;
+            document.getElementById('badge-case').className = data.badgeClass;
+            document.getElementById('icon-case').innerText = data.icon;
+            document.getElementById('title-case').innerText = data.title;
+            document.getElementById('desc-case').innerText = data.desc;
+            document.getElementById('problem-case').innerText = data.problem;
+            document.getElementById('solution-case').innerText = data.solution;
+
+            // 4. Actualizar slider y pin de termómetro
+            document.getElementById('sim-slider').value = data.similarity;
+            document.getElementById('dist-val').innerText = (data.similarity / 100).toFixed(2);
+            document.getElementById('thermometer-pin').style.left = `${data.similarity}%`;
+            document.getElementById('slider-desc').innerText = data.descSlider;
+        }
+
+        // Evento del slider del simulador de confusión
+        const slider = document.getElementById('sim-slider');
+        slider.addEventListener('input', function() {
+            const val = this.value;
+            document.getElementById('dist-val').innerText = (val / 100).toFixed(2);
+            document.getElementById('thermometer-pin').style.left = `${val}%`;
+
+            // Cambiar descripción rápida del slider según valor
+            let desc = "";
+            if (val >= 90) desc = "Zona Crítica: Alerta de Falso Negativo. Identidades idénticas.";
+            else if (val >= 70) desc = "Zona Peligrosa: Hard Negatives confundiendo activamente a la IA.";
+            else if (val >= 40) desc = "Zona Gris: Elementos intermedios con características afines.";
+            else desc = "Zona Segura: Fácil de distinguir para cualquier modelo.";
+            document.getElementById('slider-desc').innerText = desc;
+        });
+    </script>
+</body>
+</html>

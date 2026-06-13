@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualización: Modelo Bi-Encoder LiT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a; /* slate-900 */
+            color: #f8fafc;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        canvas {
+            width: 100%;
+            height: auto;
+            max-height: 65vh;
+            background-color: #1e293b; /* slate-800 */
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            display: block;
+        }
+        .step-text {
+            min-height: 100px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen p-4 md:p-8 items-center justify-center">
+
+    <div class="max-w-5xl w-full flex flex-col gap-6">
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-blue-400">Modelo LiT (Locked-image Text tuning)</h1>
+            <p class="text-slate-400 mt-2">Aprendizaje contrastivo con el Image Encoder congelado</p>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="w-full relative">
+            <canvas id="litCanvas" width="1000" height="600"></canvas>
+        </div>
+
+        <!-- Controles y Descripción -->
+        <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 flex flex-col md:flex-row gap-6 items-center">
+            
+            <div class="flex-1 step-text">
+                <h2 id="stepTitle" class="text-xl font-bold text-indigo-300 mb-2">Paso 1: Arquitectura Bi-Encoder</h2>
+                <p id="stepDescription" class="text-slate-300">
+                    El modelo procesa imágenes y textos de forma independiente usando dos "encoders" separados. Cada uno proyecta su entrada en un vector o "embedding" de igual tamaño.
+                </p>
+            </div>
+
+            <div class="flex gap-4 shrink-0">
+                <button id="btnPrev" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    Anterior
+                </button>
+                <button id="btnNext" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-md shadow-blue-900/50">
+                    Siguiente
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('litCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Textos descriptivos de los pasos
+        const stepsData = [
+            {
+                title: "Paso 1: Arquitectura Bi-Encoder",
+                desc: "El modelo consta de dos torres independientes: un 'Image Encoder' y un 'Text Encoder'. Ambos extraen características y generan un vector numérico (embedding)."
+            },
+            {
+                title: "Paso 2: Procesamiento por Lotes (Batch)",
+                desc: "Procesamos un 'batch' de N pares de (Imagen, Texto). Obtenemos N embeddings de imagen y N embeddings de texto al mismo tiempo representados como matrices."
+            },
+            {
+                title: "Paso 3: Matriz de Similitud (Inicial)",
+                desc: "Calculamos la similitud multiplicando ambos embeddings. Al no estar alineados, el resultado es ruido puro: valores muy dispares sin ningún patrón en la matriz."
+            },
+            {
+                title: "Paso 4: Entrenamiento LiT (Locked-image)",
+                desc: "¡Clave de LiT! El Image Encoder se CONGELA ❄️ (sus pesos y embeddings no cambian). Solo el Text Encoder se entrena, modificando sus embeddings para que se parezcan a los de las imágenes."
+            },
+            {
+                title: "Paso 5: Matriz de Similitud (Entrenada)",
+                desc: "¡El resultado final! Los valores más altos (rojo intenso) se concentran exclusivamente en la diagonal (los pares correctos de imagen-texto). El resto es azul (no coinciden)."
+            }
+        ];
+
+        let currentStep = 0;
+        let animationProgress = 1; 
+        let targetStep = 0;
+        let lastTime = performance.now();
+
+        const batchSize = 6;
+        const embedSize = 8;
+        
+        function randomMatrix(rows, cols, min = -1, max = 1) {
+            return Array.from({ length: rows }, () => 
+                Array.from({ length: cols }, () => Math.random() * (max - min) + min)
+            );
+        }
+
+        // Datos del modelo NO entrenado (ruido)
+        const embedImgUntrained = randomMatrix(batchSize, embedSize);
+        const embedTxtUntrained = randomMatrix(batchSize, embedSize);
+        const simMatrixUntrained = randomMatrix(batchSize, batchSize, -0.8, 0.8);
+
+        // EN LiT: La imagen nunca cambia, por lo que no necesitamos un embedImgTrained.
+        
+        // El texto se entrena para alinearse con la imagen. 
+        // Visualmente, hacemos que los embeddings de texto se vuelvan muy similares a los de la imagen + ruido leve.
+        const embedTxtTrained = Array.from({ length: batchSize }, (_, i) => 
+            Array.from({ length: embedSize }, (_, j) => Math.max(-1, Math.min(1, embedImgUntrained[i][j] + (i % 2 === 0 ?-1:1) * (Math.random() * 0.1))))
+        );
+
+        // Matriz de Similitud Entrenada (Diagonal super fuerte)
+        // Multiplicamos los embeddings producto . La diagonal tendrá valores cercanos a 1 (muy similares) y el resto cerca de -1 (no similares).
+        const simMatrixTrained = Array.from({ length: batchSize }, () => 
+            new Array(batchSize).fill(0)
+        );
+
+        // 2. Rellenamos respetando la simetría y la diagonal
+        for (let i = 0; i < batchSize; i++) {
+            for (let j = i; j < batchSize; j++) { // Empezamos en 'i' para no repetir
+                if (i === j) {
+                    // Un elemento consigo mismo siempre es 100% similar
+                    simMatrixTrained[i][j] = Math.random() * 0.3 + 0.7; // Entre 0.8 y 1 para la diagonal
+                } else {
+                    // Generamos el valor una sola vez
+                    const randomSim = Math.random() * 1 - 0.5; // Ruido leve alrededor de 0
+                    
+                    // Lo asignamos a ambas posiciones reflejadas
+                    simMatrixTrained[i][j] = randomSim;
+                    simMatrixTrained[j][i] = randomSim;
+                }
+            }
+        }
+        console.log("SimMatrix Trained:", simMatrixTrained);
+        // UI Elements
+        const titleEl = document.getElementById('stepTitle');
+        const descEl = document.getElementById('stepDescription');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnNext = document.getElementById('btnNext');
+
+        function updateUI() {
+            titleEl.innerText = stepsData[targetStep].title;
+            descEl.innerText = stepsData[targetStep].desc;
+            btnPrev.disabled = targetStep === 0;
+            btnNext.disabled = targetStep === stepsData.length - 1;
+            
+            currentStep = targetStep - 1;
+            if (currentStep < 0) currentStep = 0;
+            animationProgress = 0;
+        }
+
+        btnPrev.addEventListener('click', () => {
+            if (targetStep > 0) { targetStep--; updateUI(); }
+        });
+
+        btnNext.addEventListener('click', () => {
+            if (targetStep < stepsData.length - 1) { targetStep++; updateUI(); }
+        });
+
+        function interpolateColor(val) {
+            val = Math.max(-1, Math.min(1, val));
+            let r, g, b;
+            if (val < 0) {
+                const t = val + 1; // 0 to 1
+                r = Math.round(30 + t * (248 - 30));
+                g = Math.round(64 + t * (250 - 64));
+                b = Math.round(175 + t * (252 - 175));
+            } else {
+                const t = val; // 0 to 1
+                r = Math.round(248 + t * (185 - 248));
+                g = Math.round(250 + t * (28 - 250));
+                b = Math.round(252 + t * (28 - 252));
+            }
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function drawRoundedRect(x, y, w, h, radius, bg, border, borderWidth = 2) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + w - radius, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+            ctx.lineTo(x + w, y + h - radius);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+            ctx.lineTo(x + radius, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            
+            ctx.fillStyle = bg;
+            ctx.fill();
+            if (borderWidth > 0) {
+                ctx.lineWidth = borderWidth;
+                ctx.strokeStyle = border;
+                ctx.stroke();
+            }
+        }
+
+        function drawBox(x, y, w, h, title, subtitle, colorTheme, glow = 0) {
+            if (glow > 0) {
+                ctx.shadowColor = colorTheme.glow;
+                ctx.shadowBlur = 20 * glow;
+            } else {
+                ctx.shadowBlur = 0;
+            }
+
+            drawRoundedRect(x, y, w, h, 8, colorTheme.bg, colorTheme.border, 2 + glow*2);
+            ctx.shadowBlur = 0; 
+            
+            ctx.fillStyle = colorTheme.text;
+            ctx.font = "bold 16px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(title, x + w/2, y + h/2 - (subtitle ? 10 : 0));
+            
+            if (subtitle) {
+                ctx.font = "12px sans-serif";
+                ctx.fillStyle = colorTheme.subtext;
+                ctx.fillText(subtitle, x + w/2, y + h/2 + 12);
+            }
+        }
+
+        function drawMatrix(x, y, matrix, cellW, cellH, alpha = 1, isDiagonalFocus = false) {
+            const rows = matrix.length;
+            const cols = matrix[0].length;
+            
+            ctx.globalAlpha = alpha;
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    const val = matrix[i][j];
+                    ctx.fillStyle = interpolateColor(val);
+                    ctx.fillRect(x + j * cellW, y + i * cellH, cellW - 1, cellH - 1);
+                    
+                    // Enfoque diagonal
+                    if (isDiagonalFocus && i === j) {
+                        ctx.strokeStyle = "rgba(255, 215, 0, 0.9)"; // Dorado fuerte
+                        ctx.lineWidth = 2.5;
+                        ctx.strokeRect(x + j * cellW, y + i * cellH, cellW - 1, cellH - 1);
+                    }
+                }
+            }
+            
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, cols * cellW, rows * cellH);
+            ctx.globalAlpha = 1;
+        }
+
+        function drawArrow(x1, y1, x2, y2, color = "#94a3b8", alpha = 1) {
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - 10 * Math.cos(angle - Math.PI / 6), y2 - 10 * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x2 - 10 * Math.cos(angle + Math.PI / 6), y2 - 10 * Math.sin(angle + Math.PI / 6));
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        function drawLegend(x, y) {
+            const width = 200;
+            const height = 15;
+            
+            const gradient = ctx.createLinearGradient(x, y, x + width, y);
+            gradient.addColorStop(0, interpolateColor(-1));
+            gradient.addColorStop(0.5, interpolateColor(0));
+            gradient.addColorStop(1, interpolateColor(1));
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, y, width, height);
+            
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "12px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("-1 (Dispar)", x, y + height + 15);
+            ctx.fillText("0", x + width/2, y + height + 15);
+            ctx.fillText("1 (Similar)", x + width, y + height + 15);
+            
+            ctx.fillText("Matriz de Similitud", x + width/2, y - 10);
+        }
+
+        function lerpMatrix(matA, matB, t) {
+            
+            return matA.map((row, i) => 
+                row.map((val, j) => val + (matB[i][j] - val) * t)
+            );
+        }
+
+        // Temas de colores
+        const themes = {
+            image: { bg: "#1e3a8a", border: "#3b82f6", text: "#bfdbfe", subtext: "#93c5fd", glow: 0 },
+            imageFrozen: { bg: "#0f172a", border: "#475569", text: "#94a3b8", subtext: "#cbd5e1", glow: 0 }, 
+            text:  { bg: "#14532d", border: "#22c55e", text: "#bbf7d0", subtext: "#86efac", glow: 0 },
+            trainedText: { bg: "#166534", border: "#4ade80", text: "#f0fdf4", subtext: "#bbf7d0", glow: "#4ade80" },
+            neutral: { bg: "#334155", border: "#64748b", text: "#f8fafc", subtext: "#cbd5e1", glow: 0 }
+        };
+
+        // Bucle de renderizado principal
+        function render(time) {
+            const dt = time - lastTime;
+            lastTime = time;
+
+            if (animationProgress < 1) {
+                animationProgress += dt * 0.0015; 
+                if (animationProgress > 1) animationProgress = 1;
+            }
+            let step = currentStep + animationProgress;
+            
+
+            if (targetStep === 0) step = 0; 
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const yInput = 80;
+            const yEncoder = 220;
+            const yEmbed = 360;
+            const yMatrix = 400;
+
+            const xLeft = 250;
+            const xRight = canvas.width - 250;
+
+            // Variables de estado según el paso
+            let numBatches = 1;
+            let showMatrix = 0;
+            let matrixData = simMatrixUntrained;
+            let encoderGlow = 0;
+            let txtEmbedData = embedTxtUntrained;
+            
+            // LA IMAGEN NUNCA CAMBIA en LiT
+            let imgEmbedData = embedImgUntrained;
+
+            let themeImg = themes.image;
+            let themeTxt = themes.text;
+            let imgTitle = "Image Encoder";
+            let imgSub = "(Vision Transformer)";
+
+            // Lógica de pasos (Transiciones)
+            if (step >= 1 && step < 2) {
+                numBatches = 1 + (batchSize - 1) * (step - 1);
+            } else if (step >= 2) {
+                numBatches = batchSize;
+            }
+
+            if (step >= 2 && step < 3) {
+                showMatrix = (step - 2);
+            } else if (step >= 3) {
+                showMatrix = 1;
+            }
+
+            // Transición al paso 4 (Entrenamiento)
+            if (step >= 3 && step < 4) {
+                let t = step - 3;
+                encoderGlow = Math.sin(t * Math.PI); 
+                
+                themeImg = themes.imageFrozen;
+                imgTitle = "❄️ Image Encoder";
+                imgSub = "🔒 CONGELADO";
+
+                themeTxt = themes.trainedText;
+                txtEmbedData = lerpMatrix(embedTxtUntrained, embedTxtTrained, t);
+            } 
+            // Paso 4 hacia 5 (Matriz entrenada)
+            
+            else if (step >= 4) {
+                themeImg = themes.imageFrozen;
+                imgTitle = "❄️ Image Encoder";
+                imgSub = "🔒 CONGELADO";
+                
+                themeTxt = themes.trainedText;
+                txtEmbedData = embedTxtTrained;
+                
+                let t = step - 4;
+                
+                matrixData = lerpMatrix(simMatrixUntrained, simMatrixTrained, Math.min(animationProgress, 1));
+            }
+            
+            // 1. DIBUJAR INPUTS
+            const boxW = 140;
+            const boxH = 60;
+            
+            for (let i = Math.floor(numBatches) - 1; i >= 0; i--) {
+                const offset = i * 8;
+                const alpha = 1 - (i * 0.1);
+                ctx.globalAlpha = alpha;
+                
+                drawBox(xLeft - boxW/2 + offset, yInput + offset, boxW, boxH, "Imagen", i === 0 && numBatches===1 ? "Input" : `Batch #${i+1}`, themes.neutral);
+                drawBox(xRight - boxW/2 + offset, yInput + offset, boxW, boxH, "Texto", i === 0 && numBatches===1 ? "Input" : `Batch #${i+1}`, themes.neutral);
+                ctx.globalAlpha = 1;
+            }
+
+            drawArrow(xLeft, yInput + boxH + 10, xLeft, yEncoder - 10);
+            drawArrow(xRight, yInput + boxH + 10, xRight, yEncoder - 10);
+
+            // 2. DIBUJAR ENCODERS
+            const encW = 180;
+            const encH = 70;
+            drawBox(xLeft - encW/2, yEncoder, encW, encH, imgTitle, imgSub, themeImg, 0);
+            drawBox(xRight - encW/2, yEncoder, encW, encH, "Text Encoder", "(Text Transformer)", themeTxt, encoderGlow);
+
+            drawArrow(xLeft, yEncoder + encH + 10, xLeft, yEmbed - 10);
+            drawArrow(xRight, yEncoder + encH + 10, xRight, yEmbed - 10);
+
+            // 3. DIBUJAR EMBEDDINGS
+            const cellS = 18; 
+            const emW = embedSize * cellS;
+            const emRows = Math.floor(numBatches);
+
+            drawMatrix(xLeft - emW/2, yEmbed, imgEmbedData.slice(0, emRows), cellS, cellS);
+            ctx.fillStyle = "#cbd5e1"; ctx.font = "12px sans-serif";
+            ctx.fillText(step >= 3 ? "Embeddings Congelados" : "Image Embeddings", xLeft, yEmbed - 10);
+
+            drawMatrix(xRight - emW/2, yEmbed, txtEmbedData.slice(0, emRows), cellS, cellS);
+            ctx.fillText(step >= 3 ? "Embeddings Ajustados" : "Text Embeddings", xRight, yEmbed - 10);
+
+            // 4. MATRIZ DE SIMILITUD
+            if (showMatrix > 0) {
+                ctx.globalAlpha = showMatrix;
+                
+                const matS = 25; 
+                const matW = batchSize * matS;
+                
+                ctx.beginPath();
+                ctx.moveTo(xLeft + emW/2, yEmbed + (emRows*cellS)/2);
+                ctx.lineTo(centerX - matW/2 - 20, yMatrix + matW/2);
+                ctx.moveTo(xRight - emW/2, yEmbed + (emRows*cellS)/2);
+                ctx.lineTo(centerX + matW/2 + 20, yMatrix + matW/2);
+                ctx.strokeStyle = "rgba(148, 163, 184, " + (showMatrix * 0.5) + ")";
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                const mx = centerX - matW/2;
+                const my = yMatrix;
+                
+                const focusDiagonal = step >= 4 && animationProgress > 0.5;
+                drawMatrix(mx, my, matrixData, matS, matS, showMatrix, focusDiagonal);
+
+                ctx.fillStyle = "#94a3b8";
+                ctx.font = "12px sans-serif";
+                
+                ctx.save();
+                ctx.translate(mx - 15, my + matW/2);
+                ctx.rotate(-Math.PI/2);
+                ctx.textAlign = "center";
+                ctx.fillText("Imágenes (Fijas)", 0, 0);
+                ctx.restore();
+
+                ctx.textAlign = "center";
+                ctx.fillText("Textos (Entrenados)", mx + matW/2, my - 10);
+                
+                ctx.font = "bold 14px sans-serif";
+                ctx.fillStyle = "#f8fafc";
+                ctx.fillText("Producto Punto (x)", centerX, my - 30);
+
+                drawLegend(centerX - 100, my + matW + 40);
+
+                if (focusDiagonal) {
+                    ctx.globalAlpha = Math.min((step - 4) * 2, 1); 
+                    ctx.fillStyle = "#fde047"; 
+                    ctx.font = "italic 14px sans-serif";
+                    ctx.fillText("← Diagonal: Máxima Similitud", mx + matW + 100, my + matW/2);
+                }
+
+                ctx.globalAlpha = 1;
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        // Iniciar
+        updateUI();
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>
+```
